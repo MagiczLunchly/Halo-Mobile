@@ -143,10 +143,10 @@ Then open http://localhost:8081 in Android Chrome. Use HTTPS—not insecure LAN 
 
 | 🎨 | Mode | Use it when |
 |---|---|---|
-| 🛡️ | **Bounded readback** | You want the stable default presentation path. |
-| ⚡ | **Direct worker canvas** | You want to test reduced per-frame pixel transport on compatible hardware. |
+| ⚡ | **Direct worker canvas** | The launcher default: reduces per-frame pixel transport on compatible hardware. |
+| 🛡️ | **Bounded readback** | Add ?present=readback when you need the fixed-buffer fallback. |
 
-Add the direct presentation query parameter to the URL for experimental direct presentation. It can feel smoother on tested Android hardware, but it remains opt-in while long-session and wider-device testing continues.
+Direct worker-canvas presentation is the current default. Compare it with ?present=readback when diagnosing device-specific stability or performance.
 
 ## 📁 Project Structure
 
