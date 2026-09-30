@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Halo CE">
+<meta name="theme-color" content="#0b0d12">
+<title>Halo CE Mobile</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="backdrop" class="backdrop" aria-hidden="true"></div>
+<canvas id="screen" aria-label="Game"></canvas>
+
+  <div id="sheet-ios" class="sheet" hidden role="dialog" aria-labelledby="sheet-ios-title">
+    <h2 id="sheet-ios-title">Add it to your Home Screen</h2>
+    <ol class="steps">
+      <li><span class="step-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5"/><path d="M8 10H6v11h12V10h-2"/></svg></span>
+        <span>Tap <strong>Share</strong> in Safari's toolbar (at the bottom, or at the top on iPad).</span></li>
+      <li><span class="step-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg></span>
+        <span>Scroll down and tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</span></li>
+      <li><span class="step-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8 12l3 3 5-6"/></svg></span>
+        <span>Open <strong>Halo CE</strong> from your Home Screen. It runs full screen and keeps its data.</span></li>
+    </ol>
+    <p class="small">In Chrome or Edge on iPhone, Share is at the top right. Safari cannot add a site to the Home Screen by itself, so these steps are needed once.</p>
+    <button type="button" class="button primary" data-close>Got it</button>
+  </div>
+
+  <div id="sheet-droid" class="sheet" hidden role="dialog" aria-labelledby="sheet-droid-title">
+    <h2 id="sheet-droid-title">Install the app</h2>
+    <ol class="steps">
+      <li><span class="step-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg></span>
+        <span>In Chrome, tap the <strong>⋮</strong> menu at the top right.</span></li>
+      <li><span class="step-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M5 20h14"/></svg></span>
+        <span>Tap <strong>Install app</strong> (or <strong>Add to Home screen</strong>), then <strong>Install</strong>.</span></li>
+      <li><span class="step-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8 12l3 3 5-6"/></svg></span>
+        <span>Open <strong>Halo CE</strong> from your home screen or app drawer.</span></li>
+    </ol>
+    <p class="small">Samsung Internet: tap ☰, then <strong>Add page to</strong>, then <strong>Home screen</strong>.</p>
+    <button type="button" class="button primary" data-close>Got it</button>
+  </div>
+<div id="touch" class="touch-layer" hidden></div>
+<div id="fps" class="fps" hidden></div>
+
+<main id="launcher">
+  <section class="panel">
+    <header>
+      <h1 class="title">Halo CE <span>Mobile</span></h1>
+      <p class="subtitle">The Halo: Combat Evolved decompilation, running in your browser.</p>
+    </header>
+
+    <div id="step-play" class="step" hidden>
+      <button id="play" class="button primary" type="button">Play</button>
+      <p class="small" id="data-summary"></p>
+    </div>
+
+    <div class="step">
+      <button class="button primary" id="play-streamed-maps" type="button" hidden>Play streamed maps</button>
+    </div>
+
+    <div id="checks" class="checks" aria-live="polite"></div>
+    <p id="controller-status" class="hint controller-status"></p>
+
+    <div id="install-hint" class="hint" hidden>
+      <strong>Install it</strong> for full screen play that keeps its data.
+      <button type="button" class="button small-button" id="install-hint-how">How</button>
+    </div>
+    <div id="install-android" class="hint" hidden>
+      <strong>Install it</strong> for full screen play that keeps its data.
+      <button type="button" class="button small-button" id="install-button" hidden>Install app</button>
+      <span id="install-android-menu"><button type="button" class="button small-button" id="install-android-how">How</button></span>
+    </div>
+
+    <div id="step-data" class="step">
+      <h2>Game data</h2>
+      <p id="data-intro">The game needs the <code>maps</code> folder of your own Xbox disc image of Halo: Combat Evolved
+        (<code>.iso</code> or <code>.xiso</code>, any version). It is copied into this app's private storage
+        (up to 1.8 GB); the disc image itself can be deleted afterwards. Nothing is uploaded anywhere.</p>
+      <div id="games" class="games" role="radiogroup" aria-label="Copies of the game"></div>
+      <label class="button primary" id="add-label" for="iso-file">Choose disc image…</label>
+      <input id="iso-file" type="file" accept=".iso,.xiso,application/octet-stream,application/x-iso9660-image" hidden>
+      <label class="button" for="maps-folder">Import maps folder…</label>
+      <input id="maps-folder" type="file" webkitdirectory multiple hidden>
+      <button class="button" id="import-local-maps" type="button" hidden>Download all maps for offline use</button>
+      <p class="small">Import an extracted maps folder with ui.map and version-5 Xbox .map files.
+        Stream from the hosting server to skip the full download, or import all maps for offline use.
+        Keep the hosting server available while streaming; new maps still need loading.
+        Keep existing installations and their saves.</p>
+      <p class="small">Add as many disc images as you like (a multiplayer disc, a full game, a modded one) and pick
+        the one to play. Each keeps its own saved games.</p>
+      <div id="progress" class="progress" hidden>
+        <div class="bar"><div id="progress-fill"></div></div>
+        <p id="progress-text"></p>
+      </div>
+    </div>
+
+    <section class="online" aria-labelledby="online-title">
+      <h2 id="online-title">Play online</h2>
+      <p class="small">Everyone in a room is on one system link network: host a game from Multiplayer &gt;
+        System Link, and the others see it there. Your address: <code id="online-address"></code></p>
+      <label class="row">Your name <input id="online-name" type="text" maxlength="24" placeholder="Player" autocomplete="nickname"></label>
+      <div id="online-quick" class="row">
+        <button type="button" class="button primary" id="quick-match">Quick Match</button>
+        <span class="small">Joins an open game with your maps, or opens one.</span>
+      </div>
+      <div id="online-join" class="row">
+        <button type="button" class="button" id="online-create">New room</button>
+        <input id="online-input" type="text" inputmode="latin" autocapitalize="characters" placeholder="Room code" maxlength="16">
+        <button type="button" class="button" id="online-enter">Join</button>
+      </div>
+      <div id="online-room" hidden>
+        <p class="room-line">Room <strong id="online-code"></strong>
+          <button type="button" class="button small-button" id="online-share">Share link</button>
+          <button type="button" class="button small-button" id="online-leave">Leave</button>
+          <button type="button" class="button small-button" id="online-chat">Chat</button></p>
+        <p class="small" id="online-status"></p>
+        <p class="small" id="online-names"></p>
+        <p class="hint" id="online-role" hidden></p>
+        <label class="row"><input type="checkbox" id="online-public"> List this room in Open games</label>
+        <label class="row" id="online-note-row" hidden>Note
+          <input id="online-note" type="text" maxlength="48" placeholder="Slayer on Blood Gulch, all welcome"></label>
+      </div>
+      <div class="lobby">
+        <h3>Open games <span id="lobby-count" class="small"></span></h3>
+        <div id="lobby-list" class="lobby-list"></div>
+        <p class="small" id="lobby-empty">No open games right now. Quick Match opens one others can join.</p>
+      </div>
+    </section>
+
+    <details class="settings">
+      <summary>Settings and data</summary>
+      <label class="row"><input type="checkbox" id="opt-touch"> Touch controls</label>
+      <label class="row">Touch layout
+        <select id="opt-layout">
+          <option value="modern">Modern (like mobile shooters)</option>
+          <option value="xbox">Original Xbox controller</option>
+        </select>
+        <button type="button" class="button small-button" id="edit-layout">Edit layout</button></label>
+      <label class="row">Aim sensitivity <input type="range" id="opt-look" min="0.4" max="3" step="0.1"></label>
+      <label class="row"><input type="checkbox" id="opt-silent" checked> Sound when the phone is on silent (pauses music from other apps)</label>
+      <label class="row"><input type="checkbox" id="opt-vsync" checked> Wait for the display (smoother, saves battery)</label>
+      <label class="row"><input type="checkbox" id="opt-fps"> Show the frame rate</label>
+      <label class="row"><input type="checkbox" id="opt-gldebug"> Log graphics errors (for bug reports; slower)</label>
+      <p class="small">Online play: a TURN relay, for networks that WebRTC cannot cross directly (some mobile networks).</p>
+      <label class="row">TURN server <input type="text" id="opt-turn-url" placeholder="turn:host:3478"></label>
+      <label class="row">TURN user <input type="text" id="opt-turn-user" autocomplete="off"></label>
+      <label class="row">TURN password <input type="password" id="opt-turn-password" autocomplete="off"></label>
+      <div class="row buttons">
+        <button type="button" class="button" id="export-saves">Export saved games</button>
+        <label class="button" for="import-saves-file">Restore saved games…</label>
+        <input id="import-saves-file" type="file" accept=".zip,application/zip" hidden>
+        <button type="button" class="button" id="show-log">Show log</button>
+        <button type="button" class="button danger" id="delete-data">Delete all game data</button>
+      </div>
+      <p class="small" id="storage-summary"></p>
+      <p class="small" id="version"></p>
+    </details>
+
+    <p class="legal credits"><strong>Credits.</strong> Halo CE Mobile is built on
+      <a href="https://github.com/cybersecurity/halo-ce-universal" target="_blank" rel="noopener">halo-ce-universal</a>
+      by cybersecurity (the Linux, Windows and Android ports), which starts from the Halo: Combat Evolved decompilation of
+      <a href="https://github.com/punpckhdq/halo" target="_blank" rel="noopener">punpckhdq/halo</a> and
+      <a href="https://github.com/bnunu/halo-1" target="_blank" rel="noopener">bnunu/halo-1</a>.
+      Fonts: Orbitron and Rajdhani (SIL Open Font License).</p>
+    <p class="legal">An unofficial fan project. Halo CE Mobile was created under Microsoft's
+      "<a href="https://www.xbox.com/en-US/developers/rules" target="_blank" rel="noopener">Game Content Usage Rules</a>"
+      using assets from Halo: Combat Evolved. It is not endorsed by or affiliated with Microsoft, Xbox Game Studios or
+      Bungie. Halo © Microsoft Corporation. Use the provided streamed maps when available, or import your own copy of the game.</p>
+  </section>
+</main>
+
+<button type="button" id="menu-button" class="menu-button" aria-label="Menu" hidden>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  <span id="chat-unread" class="unread" hidden></span>
+</button>
+<div id="chat-feed" class="chat-feed" aria-live="polite"></div>
+<div id="chat" class="chat" hidden role="dialog" aria-label="Chat">
+  <div class="chat-head">
+    <strong>Chat</strong> <span id="chat-room" class="small"></span>
+    <button type="button" class="button small-button" id="chat-close">Close</button>
+  </div>
+  <div id="chat-log" class="chat-log"></div>
+  <div class="chat-quick" id="chat-quick"></div>
+  <form id="chat-form" class="chat-form" autocomplete="off">
+    <input id="chat-input" type="text" maxlength="200" placeholder="Message the room" enterkeyhint="send">
+    <button type="submit" class="button primary small-button">Send</button>
+  </form>
+</div>
+<div id="game-menu" class="overlay game-menu" hidden>
+  <div class="panel">
+    <h2>Menu</h2>
+    <label class="row">Aim sensitivity <input type="range" id="menu-look" min="0.4" max="3" step="0.1"></label>
+    <label class="row" id="menu-layout-row">Touch layout
+      <select id="menu-layout">
+        <option value="modern">Modern (like mobile shooters)</option>
+        <option value="xbox">Original Xbox controller</option>
+      </select>
+      <button type="button" class="button small-button" id="menu-edit-layout">Edit layout</button></label>
+    <div class="row buttons"><button type="button" class="button" id="menu-chat">Chat</button></div>
+    <label class="row"><input type="checkbox" id="menu-silent"> Sound when the phone is on silent</label>
+    <label class="row"><input type="checkbox" id="menu-fps"> Show the frame rate</label>
+    <label class="row" id="menu-game-row">Game
+      <select id="menu-game"></select>
+      <button type="button" class="button small-button" id="menu-switch-game">Restart with it</button></label>
+    <div class="row buttons">
+      <button type="button" class="button" id="menu-quit">Quit to the start page</button>
+      <button type="button" class="button primary" id="menu-resume">Resume</button>
+    </div>
+  </div>
+</div>
+<div id="layout-editor" class="layout-editor" hidden></div>
+<div id="rotate" class="overlay" hidden><p>Turn your device sideways to play.</p></div>
+<div id="toast" class="toast" hidden></div>
+<div id="fatal" class="overlay fatal" hidden>
+  <div class="panel">
+    <h2>The game stopped</h2>
+    <pre id="fatal-text"></pre>
+    <div class="row buttons">
+      <button type="button" class="button primary" id="fatal-reload">Reload</button>
+      <button type="button" class="button" id="fatal-log">Copy log</button>
+    </div>
+  </div>
+</div>
+<div id="log-view" class="overlay" hidden>
+  <div class="panel wide">
+    <pre id="log-text"></pre>
+    <div class="row buttons">
+      <button type="button" class="button" id="log-copy">Copy</button>
+      <button type="button" class="button primary" id="log-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="input.js"></script>
+<script src="net.js"></script>
+<script src="lobby.js"></script>
+<script src="stream-maps.js"></script>
+<script src="presenter.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

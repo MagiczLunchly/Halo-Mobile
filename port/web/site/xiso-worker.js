@@ -1,0 +1,318 @@
+/*
+XISO-WORKER.JS
+
+Copies the maps folder out of an Xbox disc image of Halo: Combat Evolved
+(an "xiso", .iso or .xiso) into the site's Origin Private File System, as
+port/linux/src/xiso.c does for the desktop ports. It runs in a Worker so
+that it can use the synchronous OPFS access handles, which every browser
+with OPFS has (Safari has no writable streams before 17.4).
+
+The file system is XDVDFS: 2048-byte sectors; a volume descriptor at 0x10000
+that starts and ends with "MICROSOFT*XBOX*MEDIA" and gives the root
+directory's sector and size; directories whose entries form a binary tree
+(left and right subtree offsets in 4-byte units, the start sector, the size,
+attributes, the name's length and the name). Images of a whole disc put the
+game partition further in, at one of the offsets below (extract-xiso's).
+
+The page gets messages { type: 'progress', file, done, total },
+{ type: 'done', files, bytes } or { type: 'error', message }.
+*/
+
+'use strict';
+
+const SECTOR_SIZE = 2048;
+const VOLUME_DESCRIPTOR_OFFSET = 0x10000;
+const PARTITION_OFFSETS = [0, 0x0FD90000, 0x02080000, 0x18300000];
+const MAGIC = 'MICROSOFT*XBOX*MEDIA';
+const ENTRY_HEADER_SIZE = 14;
+const ATTRIBUTE_DIRECTORY = 0x10;
+const COPY_CHUNK = 4 * 1024 * 1024;
+// written last: the page starts the game only when it is there
+const COMPLETE_MARKER = '.complete';
+
+async function readAt(file, offset, size) {
+  const end = Math.min(offset + size, file.size);
+  if (offset >= end) return new Uint8Array(0);
+  return new Uint8Array(await file.slice(offset, end).arrayBuffer());
+}
+
+function text(bytes, start, length) {
+  let result = '';
+  for (let i = 0; i < length; i++) result += String.fromCharCode(bytes[start + i]);
+  return result;
+}
+
+function u32(bytes, at) {
+  return (bytes[at] | bytes[at + 1] << 8 | bytes[at + 2] << 16 | bytes[at + 3] << 24) >>> 0;
+}
+
+async function findVolume(file) {
+  for (const partition of PARTITION_OFFSETS) {
+    const descriptor = await readAt(file, partition + VOLUME_DESCRIPTOR_OFFSET, SECTOR_SIZE);
+    if (descriptor.length < SECTOR_SIZE) continue;
+    if (text(descriptor, 0, 20) === MAGIC && text(descriptor, 0x7EC, 20) === MAGIC) {
+      return { partition, rootSector: u32(descriptor, 20), rootSize: u32(descriptor, 24) };
+    }
+  }
+  return null;
+}
+
+// the entries of a directory table, files or directories as asked
+function walkDirectory(table, wantDirectories) {
+  const entries = [];
+  let visited = 0;
+  const walk = (offset, depth) => {
+    offset *= 4;
+    if (depth > 64 || ++visited > 4096 || offset + ENTRY_HEADER_SIZE > table.length) return;
+    const left = table[offset] | table[offset + 1] << 8;
+    const right = table[offset + 2] | table[offset + 3] << 8;
+    if (left === 0xFFFF) return;
+    const nameLength = table[offset + 13];
+    if (left) walk(left, depth + 1);
+    if (offset + ENTRY_HEADER_SIZE + nameLength <= table.length && nameLength > 0 &&
+        !(table[offset + 12] & ATTRIBUTE_DIRECTORY) === !wantDirectories) {
+      const name = text(table, offset + ENTRY_HEADER_SIZE, nameLength);
+      if (name !== '.' && name !== '..' && !name.includes('/') && !name.includes('\\')) {
+        entries.push({ name, sector: u32(table, offset + 4), size: u32(table, offset + 8) });
+      }
+    }
+    if (right) walk(right, depth + 1);
+  };
+  walk(0, 0);
+  return entries;
+}
+
+async function readDirectory(file, volume, sector, size) {
+  if (!size || size > 1024 * 1024) return null;
+  const table = await readAt(file, volume.partition + sector * SECTOR_SIZE, size);
+  return table.length === size ? table : null;
+}
+
+async function writeFile(directory, name, source, onChunk) {
+  const handle = await directory.getFileHandle(name, { create: true });
+  const access = await handle.createSyncAccessHandle();
+  try {
+    await access.truncate(0);
+    let position = 0;
+    while (position < source.size) {
+      const count = Math.min(COPY_CHUNK, source.size - position);
+      const bytes = await readAt(source.file, source.offset + position, count);
+      if (bytes.length !== count) throw new Error(`Could not read ${name} from the disc image (is it complete?).`);
+      let written = 0;
+      while (written < count) {
+        const result = await access.write(bytes.subarray(written), { at: position + written });
+        if (!result) throw new Error(`Could not write ${name} (is the device full?).`);
+        written += result;
+      }
+      position += count;
+      onChunk(count);
+    }
+    await access.flush();
+  } finally {
+    await access.close();
+  }
+}
+
+// the folder a copy goes in: [] for the first copy (maps at the top), or
+// ['games', id] for each one added after it
+async function folder(path, create) {
+  let directory = await navigator.storage.getDirectory();
+  for (const name of path) directory = await directory.getDirectoryHandle(name, { create });
+  return directory;
+}
+
+// info.json, beside the copy's maps: its name, where it came from, when
+async function writeInfo(directory, info, filename = 'info.json') {
+  const handle = await directory.getFileHandle(filename, { create: true });
+  const access = await handle.createSyncAccessHandle();
+  try {
+    await access.truncate(0);
+    const bytes = new TextEncoder().encode(JSON.stringify(info));
+    let written = 0;
+    while (written < bytes.length) {
+      const count = await access.write(bytes.subarray(written), { at: written });
+      if (!count) throw new Error('Cannot write installation metadata.');
+      written += count;
+    }
+    await access.flush();
+  } finally {
+    await access.close();
+  }
+}
+
+async function extract(file, target = [], name = '') {
+  const volume = await findVolume(file);
+  if (!volume) throw new Error('This file is not an Xbox disc image (no XDVDFS volume was found).');
+
+  const root = await readDirectory(file, volume, volume.rootSector, volume.rootSize);
+  if (!root) throw new Error("The disc image's file system is damaged.");
+  const maps = walkDirectory(root, true).find((entry) => entry.name.toLowerCase() === 'maps');
+  if (!maps) throw new Error('The disc image has no maps folder: it is not a Halo disc.');
+  const table = await readDirectory(file, volume, maps.sector, maps.size);
+  if (!table) throw new Error("The disc image's maps folder is damaged.");
+  const files = walkDirectory(table, false);
+  if (!files.some((entry) => entry.name.toLowerCase() === 'ui.map')) {
+    throw new Error("The disc image's maps folder has no ui.map: it is not a Halo disc.");
+  }
+
+  const total = files.reduce((sum, entry) => sum + entry.size, 0);
+  const storage = await folder(target, true);
+  // a new copy replaces whatever an earlier, perhaps interrupted, one left
+  await storage.removeEntry('maps', { recursive: true }).catch(() => {});
+  const directory = await storage.getDirectoryHandle('maps', { create: true });
+  let done = 0;
+  let lastReport = 0;
+  for (const entry of files) {
+    await writeFile(directory, entry.name, {
+      file,
+      offset: volume.partition + entry.sector * SECTOR_SIZE,
+      size: entry.size,
+    }, (count) => {
+      done += count;
+      const now = Date.now();
+      if (now - lastReport > 100 || done === total) {
+        lastReport = now;
+        postMessage({ type: 'progress', file: entry.name, done, total });
+      }
+    });
+  }
+  const marker = await directory.getFileHandle(COMPLETE_MARKER, { create: true });
+  const access = await marker.createSyncAccessHandle();
+  await access.truncate(0);
+  await access.write(new TextEncoder().encode(JSON.stringify({ files: files.map((f) => f.name), bytes: total })), { at: 0 });
+  await access.flush();
+  await access.close();
+  if (target.length) await writeInfo(storage, { name, source: file.name, added: Date.now() });
+  return { files: files.length, bytes: total };
+}
+
+// Loose-map import: validate every file before creating any OPFS entries.
+// Read/write in bounded chunks rather than buffering the entire game.
+async function mapHeader(entry) {
+  if (entry.file) return readAt(entry.file, 0, 2048);
+  const response = await fetch(entry.url, { headers: { Range: 'bytes=0-2047' }, cache: 'no-store' });
+  if (response.status !== 206) throw new Error('The local server must support byte ranges.');
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+async function importMaps(message) {
+  const entries = message.files
+    ? message.files.map((file) => ({ name: file.name.toLowerCase(), size: file.size, file }))
+    : (message.entries || []).map((entry) => {
+      const url = new URL(entry.url, self.location.href);
+      if (url.origin !== self.location.origin) throw new Error('Import maps from this local server only.');
+      return { name: String(entry.name).toLowerCase(), size: entry.size, url: url.href };
+    });
+  if (!entries.length || entries.length > 128) throw new Error('Choose between 1 and 128 Xbox maps.');
+  const names = new Set();
+  for (const entry of entries) {
+    if (!/^[a-z0-9_-]+\.map$/.test(entry.name) || names.has(entry.name)) {
+      throw new Error('Map filenames must be unique, without folders or special characters.');
+    }
+    names.add(entry.name);
+    if (!Number.isSafeInteger(entry.size) || entry.size < 2048) throw new Error('Invalid map size: ' + entry.name);
+    const header = await mapHeader(entry);
+    // Xbox headers describe decompressed size, not the stored compressed length.
+    if (header.length !== 2048 || text(header, 0, 4) !== 'daeh' || u32(header, 4) !== 5 ||
+        (u32(header, 8) < entry.size || u32(header, 8) > 0x40000000) || text(header, 2044, 4) !== 'toof') {
+      throw new Error(entry.name + ' has an invalid version-5 Xbox Halo map header.');
+    }
+  }
+  if (!names.has('ui.map')) throw new Error('The folder must include ui.map.');
+  const total = entries.reduce((sum, entry) => sum + entry.size, 0);
+  const estimate = await navigator.storage.estimate();
+  if (estimate.quota && total > estimate.quota - (estimate.usage || 0)) throw new Error('Not enough browser storage.');
+  if (!Array.isArray(message.target) || message.target.length !== 2 || message.target[0] !== 'games' ||
+      !/^maps-[a-z0-9-]+$/.test(message.target[1])) throw new Error('Import into a new game-library folder.');
+  const base = await folder(message.target, true);
+  // Refuse replacement even if a caller supplies an already-used id.
+  let exists = false;
+  try { await base.getDirectoryHandle('maps'); exists = true; } catch { /* new */ }
+  if (exists) throw new Error('This installation already exists; import as a new copy.');
+  const directory = await base.getDirectoryHandle('maps', { create: true });
+  let done = 0;
+  const progress = (name, count) => {
+    done += count;
+    postMessage({ type: 'progress', file: name, done, total });
+  };
+  for (const entry of entries) {
+    if (entry.file) {
+      await writeFile(directory, entry.name, { file: entry.file, offset: 0, size: entry.size },
+        (count) => progress(entry.name, count));
+    } else {
+      const response = await fetch(entry.url, { cache: 'no-store' });
+      if (!response.ok || !response.body) throw new Error('Cannot read ' + entry.name);
+      const reader = response.body.getReader();
+      const handle = await directory.getFileHandle(entry.name, { create: true });
+      const access = await handle.createSyncAccessHandle();
+      let position = 0;
+      try {
+        await access.truncate(0);
+        while (true) {
+          const { value, done: finished } = await reader.read();
+          if (finished) break;
+          if (position + value.length > entry.size) throw new Error('Map size changed: ' + entry.name);
+          let written = 0;
+          while (written < value.length) {
+            const count = await access.write(value.subarray(written), { at: position + written });
+            if (!count) throw new Error('Cannot write ' + entry.name);
+            written += count;
+          }
+          position += value.length;
+          progress(entry.name, value.length);
+        }
+        if (position !== entry.size) throw new Error('Incomplete map: ' + entry.name);
+        await access.flush();
+      } finally {
+        await reader.cancel().catch(() => {});
+        await access.close();
+      }
+    }
+  }
+  await writeInfo(base, { name: message.name || 'Halo maps', source: 'Imported maps folder', added: Date.now() });
+  // Commit only after all files and metadata have been flushed.
+  await writeInfo(directory, { files: entries.map((entry) => entry.name), bytes: total }, COMPLETE_MARKER);
+  return { files: entries.length, bytes: total };
+}
+
+onmessage = async (event) => {
+  const message = event.data;
+  try {
+    if (message.op === 'import-maps') {
+      const result = await importMaps(message);
+      postMessage({ type: 'done', ...result });
+      return;
+    }
+    if (message.op === 'write-files') {
+      // restored saved games: [{ path: ['save', 'x', 'y'], bytes }] under the copy's folder
+      const base = await folder(message.target, true);
+      for (const { path, bytes } of message.files) {
+        let directory = base;
+        for (const name of path.slice(0, -1)) directory = await directory.getDirectoryHandle(name, { create: true });
+        const handle = await directory.getFileHandle(path[path.length - 1], { create: true });
+        const access = await handle.createSyncAccessHandle();
+        try {
+          await access.truncate(0);
+          await access.write(bytes, { at: 0 });
+          await access.flush();
+        } finally {
+          await access.close();
+        }
+      }
+      postMessage({ type: 'done', files: message.files.length });
+      return;
+    }
+    if (message.op === 'rename') {
+      const directory = await folder(message.target, false);
+      let info = {};
+      try { info = JSON.parse(await (await (await directory.getFileHandle('info.json')).getFile()).text()); } catch { /* none */ }
+      await writeInfo(directory, { ...info, name: message.name });
+      postMessage({ type: 'done' });
+      return;
+    }
+    const result = await extract(message.file, message.target || [], message.name || '');
+    postMessage({ type: 'done', ...result });
+  } catch (error) {
+    postMessage({ type: 'error', message: error && error.message ? error.message : String(error) });
+  }
+};
