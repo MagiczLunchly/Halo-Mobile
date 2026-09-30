@@ -1,179 +1,98 @@
-# Halo CE Mobile
+# Halo Mobile
 
-## SubmitGame source
+Halo Mobile is a browser-first port of the Halo: Combat Evolved decompilation. It runs as an installable web app on current Android, iPhone, iPad, and desktop browsers.
 
-- Build the web port with Emscripten 6.0.10, Python 3.10 or later, and Ninja: run `python3 configure.py --release`, then `ninja web`.
-- Run `node --test port/web/tests/*.cjs` to verify the web tests.
-- Supply your own Xbox game maps or disc image; keep maps, disc images, saves, credentials, and generated builds out of Git.
-- Serve `build/web/site` with cross-origin isolation headers; use HTTPS on phones or localhost through ADB reverse.
-- Configure `/downloaded-maps/manifest.json` and byte-range map endpoints separately to enable streamed play.
-- Open the launcher directly; use the top Play controls and the launcher installation guides.
-- Add `?present=direct` to try experimental direct worker rendering; omit it for default readback presentation.
-- Preserve upstream attribution and licenses; compare this source with [fucktrevor/HCE-Mobile](https://github.com/fucktrevor/HCE-Mobile).
+This repository provides the mobile web build, a direct Play launcher, touch and controller controls, saved games in browser storage, streamed-map support, and System Link matchmaking.
 
+> **No game data is included.** This repository does not contain, download, or redistribute Halo maps, disc images, saves, or other proprietary game data. Supply compatible game data from a source you are authorized to use.
 
-Halo CE Mobile is Halo: Combat Evolved as an installable web app: the game
-compiled to WebAssembly, with touch and controller input, online System Link
-play, and a game library for your own disc images. It is a fork of
-[cybersecurity/halo-ce-universal](https://github.com/cybersecurity/halo-ce-universal),
-the Linux, Windows and Android ports of the Halo CE decompilation by
-[punpckhdq/halo](https://github.com/punpckhdq/halo) and
-[bnunu/halo-1](https://github.com/bnunu/halo-1); all credit for the
-decompilation and those ports goes to them. The web port is in
-[port/web](port/web/README.md). An unofficial fan project, not affiliated with
-or endorsed by Microsoft; it includes no game data.
+Halo Mobile is an unofficial fan project. It is not affiliated with or endorsed by Microsoft.
 
-The original project's README follows.
+## Features
 
----
+- Open directly to the launcher and use **Play** or **Play streamed maps** at the top.
+- Install as a full-screen progressive web app.
+- Use touch controls, Bluetooth or USB controllers, or keyboard and mouse.
+- Keep game data, saves, configuration, and shader caches in Origin Private File System storage.
+- Import a disc image or maps folder privately into the browser.
+- Stream maps from a separately hosted range-request endpoint instead of importing all map files.
+- Host or join Halo System Link games through the launcher.
+- Use default bounded readback presentation or experimental direct worker-canvas presentation with the presentation query parameter.
 
-# Halo: Combat Evolved for Linux, Windows, Android and the web (iOS)
+## Requirements
 
-This project is a port of the Halo: Combat Evolved decompilation to Linux,
-Windows and Android. The decompilation is of the Xbox build 2342
-(`cachebeta.exe`, SHA-256
-`4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`).
+### Play
 
-<img width="1289" height="995" alt="The game on Linux" src="https://github.com/user-attachments/assets/0d3ad50f-f8b8-46cf-aef8-e3661da2a7d7" />
+- A current browser with WebGL 2, OffscreenCanvas, SharedArrayBuffer, and OPFS.
+- Android Chrome, iOS or iPadOS 17 or later, or a current desktop browser.
+- Approximately 2 GB of browser storage for a full local map import.
+- Compatible Halo game data that you are authorized to use.
 
-The port starts from the decompilation of [bnunu/halo-1](https://github.com/bnunu/halo-1).
-That project is a fork of [punpckhdq/halo](https://github.com/punpckhdq/halo).
+Use HTTPS for phones on a network. Localhost is suitable for local development and Android ADB reverse testing.
 
-## Download
+### Build
 
-GitHub Actions builds the game for each commit. These links download the
-builds of the latest release:
+- Python 3.10 or later.
+- Ninja.
+- Emscripten 6.0.10.
+- Network access for the first build, which obtains build dependencies.
 
-| Platform | Release | Debug |
-| --- | --- | --- |
-| Linux | [halo-linux-release.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-linux-release.zip) | [halo-linux-debug.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-linux-debug.zip) |
-| Windows | [halo-windows-release.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-windows-release.zip) | [halo-windows-debug.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-windows-debug.zip) |
-| Android | [halo-android-release.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-android-release.zip) | [halo-android-debug.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-android-debug.zip) |
+## Build the web app
 
-Use the release build to play. The debug build stops at the first failed
-assertion and writes it to the log. Use the debug build to find and report
-problems.
+    git clone https://github.com/OMG-Guest/Halo-Mobile.git
+    cd Halo-Mobile
 
-The game updates itself. At start-up it looks for a newer release, and asks
-if you want to install it. Refer to "Updates" in
-[port/linux/README.md](port/linux/README.md#updates).
+    git clone --depth 1 https://github.com/emscripten-core/emsdk.git ../emsdk
+    python3 ../emsdk/emsdk.py install 6.0.10
+    python3 ../emsdk/emsdk.py activate 6.0.10
+    source ../emsdk/emsdk_env.sh
 
-Each build of the `main` branch that passes on all three platforms is a new
-release. The [Releases](https://github.com/cybersecurity/halo-ce-universal/releases)
-page keeps the last five releases. If the latest build has a problem, get
-an older build from that page.
+    python3 configure.py --release
+    ninja web
+    node --test port/web/tests/*.cjs
 
-## Game data
+The browser app is written to build/web/site.
 
-The port does not include the game data. Download an Xbox disc image
-(`.xiso` or `.iso`) of Halo: Combat Evolved. All versions of the game
-operate. The maps of the European (PAL) version were made for a slower
-console. The port changes them to play as the North American (NTSC) maps do,
-so players of the two versions can play together.
+## Run locally
 
-1. Start the game.
-2. At the first start, the game asks for the disc image. Select it.
-3. The game extracts the `maps/` folder. Then the game starts.
+Serve build/web/site with a server that preserves byte ranges for maps and provides cross-origin isolation. For a basic local check:
 
-On Linux and Windows, the game puts `maps/` next to the executable. On
-Android, copy the disc image to the phone first. The app puts `maps/` in its
-data folder. Refer to [port/android/README.md](port/android/README.md).
+    python3 -m http.server --directory build/web/site 8081
 
-## Platforms
+Open http://localhost:8081. The service worker reloads once to establish isolation.
 
-Each platform has its own instructions:
+For Android USB testing:
 
-| Platform | Instructions |
-| --- | --- |
-| Linux (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/linux/README.md](port/linux/README.md) |
-| Windows (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/windows/README.md](port/windows/README.md) |
-| Android (arm64 app, OpenGL ES 3, SDL3) | [port/android/README.md](port/android/README.md) |
-| Web: iPhone, iPad and browsers (WebAssembly, WebGL 2, installable web app) | [port/web/README.md](port/web/README.md) |
+    adb reverse tcp:8081 tcp:8081
 
-The Linux README also gives the controls, the settings and the multiplayer
-functions. These are almost the same on all platforms.
+Then open http://localhost:8081 in Chrome on the device. Do not use an insecure LAN HTTP address for full mobile functionality; deploy HTTPS instead.
 
-## Multiplayer
+## Add game data
 
-The game can play system link games on a local network and on the internet:
+Choose one path from the launcher:
 
-- A system link game can have up to 128 players on up to 128 machines.
-- Linux, Windows and Android machines can play in the same game.
-- An invite link lets a machine join a game on the internet. No server of
-  this project is necessary.
-- The default netcode is new. Each machine moves its own player at once,
-  and the host makes the decisions for the game. Refer to
-  [port/linux/NETCODE.md](port/linux/NETCODE.md).
+1. **Choose disc image**: import an authorized ISO or XISO; Halo Mobile extracts and retains only its maps in private browser storage.
+2. **Import maps folder**: select an extracted compatible maps directory.
+3. **Play streamed maps**: configure a separate downloaded-maps manifest plus HTTP byte-range endpoints, then retain that server connection while playing.
 
-## Build the game
+Map data is intentionally ignored by Git. Do not commit game data, saves, credentials, or generated build output.
 
-You do not need the Xbox SDK. The port supplies the SDK declarations that
-the game uses. Refer to [port/include/xdk](port/include/xdk/README.md).
+## Presentation modes
 
-To build the game:
+The normal mode uses bounded readback to keep browser graphics allocation stable.
 
-1. Install Python and [ninja](https://ninja-build.org/).
-2. Install the tools for your platform. Refer to the README for the
-   platform.
-3. In the root folder of the repository, enter `python configure.py`.
-4. Enter `ninja` with the target for the platform:
+Add the presentation query parameter with the direct value to use experimental direct canvas presentation. It avoids per-frame readback and can feel smoother on tested Android hardware, but it remains opt-in while more device and long-session tests are completed.
 
-| Target | Result |
-| --- | --- |
-| `ninja linux` | `build/linux/halo` |
-| `ninja windows` (on Windows) | `build/windows/halo.exe` and `SDL3.dll` |
-| `ninja android_apk` | `port/android/app/build/outputs/apk/debug/app-debug.apk` |
-| `ninja web` (with Emscripten) | `build/web/site` |
+## Project layout
 
-If you enter `ninja` without a target, ninja builds the game for the
-computer that you use.
+- port/web/site/: launcher, UI, service worker, controls, and browser runtime.
+- port/web/src/: Emscripten and Web platform bridge.
+- port/web/tests/: Node tests for launcher, presenter, and streamed-map behavior.
+- source/: Halo decompilation source.
+- tools/web_build.py: Ninja build graph for the browser port.
 
-`tools/ci_build.py` makes the same builds as GitHub Actions. For example,
-enter `python tools/ci_build.py linux release`.
+## Attribution and licenses
 
-### Build options
+This project builds on https://github.com/fucktrevor/HCE-Mobile, https://github.com/cybersecurity/halo-ce-universal, https://github.com/bnunu/halo-1, and https://github.com/punpckhdq/halo. Preserve their attribution and the repository licenses when redistributing or modifying this source.
 
-Give these options to `configure.py`:
-
-| Option | Result |
-| --- | --- |
-| (none) | A debug build. A failed assertion stops the game. |
-| `--release` | A release build. The game does not examine assertions, as in the retail game. |
-| `--portable` | The Linux and Windows builds operate on all x86-64 processors. Use this option for builds that you give to other persons. |
-| `--lto=thin`, `--lto=off` | Less link-time optimization. The link is faster. |
-| `--pgo=off` | No profile-guided optimization. |
-| `--pgo=train` | Records a new optimization profile. Refer to "Optimization profiles". |
-
-Without `--portable`, the Linux and Windows builds use all the instructions
-of the processor that builds them (`-march=native`). Such a build does not
-always start on a different computer.
-
-### Optimization profiles
-
-The builds use profiles of the game to optimize the code:
-
-- `pgo/halo_linux.profdata` for Linux and Android.
-- `pgo/halo_windows.profdata` for Windows.
-
-The profiles need clang 22 or later. With an older clang, the builds do not
-use the profiles.
-
-To record a new profile:
-
-1. Delete the profile.
-2. Enter `python configure.py --pgo=train`.
-3. Enter `ninja linux` or `ninja windows`.
-
-The build then plays the main menu and the first minute of each campaign
-level. This procedure continues for approximately 15 minutes. The game
-data must be in `assets/`.
-
-### The byte-matching build
-
-The original project also has a byte-matching build. That build compiles
-the game with the compiler of the Xbox SDK and compares the result with
-`cachebeta.exe`. This project does not generate that build, because the
-Xbox SDK is not free to distribute. The sources of that build are not
-changed. To use the build again, set `SolutionConfig.matching` in
-`tools/project_x86.py`. You must also have the Xbox SDK in `xbox/` and
-`cachebeta.exe` in the root folder.
+Read LICENSE.md and the license notices in included components.
