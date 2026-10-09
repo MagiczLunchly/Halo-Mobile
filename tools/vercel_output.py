@@ -12,6 +12,11 @@ def output_config(map_origin=""):
         "Cross-Origin-Embedder-Policy": "require-corp",
         "Cross-Origin-Resource-Policy": "same-origin",
     }, "continue": True}, {
+        # Only the public launcher document needs cross-site iframe embedding.
+        "src": "/(?:index\\.html)?",
+        "headers": {"Cross-Origin-Resource-Policy": "cross-origin"},
+        "continue": True,
+    }, {
         "src": "/(?:sw\\.js|version\\.json|local-maps\\.json)",
         "headers": {"Cache-Control": "no-cache"}, "continue": True,
     }]
