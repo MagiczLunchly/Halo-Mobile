@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "dnf install -y python3 ninja-build",
+  "buildCommand": "bash tools/vercel_build.sh"
+}

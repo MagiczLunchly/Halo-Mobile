@@ -49,3 +49,4 @@ dist/
 *.iso
 *.xiso
 downloaded-maps/
+.vercel/
