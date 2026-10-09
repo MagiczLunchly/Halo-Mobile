@@ -20,6 +20,7 @@ The page gets messages { type: 'progress', file, done, total },
 
 'use strict';
 
+
 const SECTOR_SIZE = 2048;
 const VOLUME_DESCRIPTOR_OFFSET = 0x10000;
 const PARTITION_OFFSETS = [0, 0x0FD90000, 0x02080000, 0x18300000];
@@ -278,6 +279,18 @@ async function importMaps(message) {
 onmessage = async (event) => {
   const message = event.data;
   try {
+    if (message.op === 'download-maps') {
+      importScripts('maps-download.js');
+      const result = await downloadMapPack(message);
+      postMessage({ type: 'done', ...result });
+      return;
+    }
+    if (message.op === 'download-iso') {
+      importScripts('iso-download.js');
+      const result = await downloadIso(message, extract);
+      postMessage({ type: 'done', ...result });
+      return;
+    }
     if (message.op === 'import-maps') {
       const result = await importMaps(message);
       postMessage({ type: 'done', ...result });

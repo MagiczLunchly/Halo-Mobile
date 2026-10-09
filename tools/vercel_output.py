@@ -32,6 +32,10 @@ def output_config(map_origin=""):
             {"src": "/downloaded-maps/([a-z0-9_-]+\\.map)",
              "dest": origin + "/downloaded-maps/$1"},
         ])
+    routes.append({
+        "src": "/game-data/halo-maps\\.bin\\.gz",
+        "dest": "https://github.com/MagiczLunchly/Halo-Mobile/releases/download/halo-game-data-v1/halo-maps.bin.gz",
+    })
     routes.append({"handle": "filesystem"})
     return {"version": 3, "routes": routes, "cache": [".cache/emsdk/**"]}
 

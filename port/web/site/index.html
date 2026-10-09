@@ -55,6 +55,14 @@
       <p class="subtitle">The Halo: Combat Evolved decompilation, running in your browser.</p>
     </header>
 
+    <section id="progress" class="progress" hidden aria-label="Game download">
+      <div class="download-heading"><strong id="download-title">Installing game data</strong><strong id="download-percent">0%</strong></div>
+      <div id="download-bar" class="bar" role="progressbar" aria-label="Game download" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progress-fill"></div></div>
+      <p id="progress-text" role="status"></p>
+      <p id="download-detail" class="small"></p>
+      <button class="button" id="retry-download" type="button" hidden>Retry game download</button>
+    </section>
+
     <div id="step-play" class="step" hidden>
       <button id="play" class="button primary" type="button">Play</button>
       <p class="small" id="data-summary"></p>
@@ -94,10 +102,6 @@
         Keep existing installations and their saves.</p>
       <p class="small">Add as many disc images as you like (a multiplayer disc, a full game, a modded one) and pick
         the one to play. Each keeps its own saved games.</p>
-      <div id="progress" class="progress" hidden>
-        <div class="bar"><div id="progress-fill"></div></div>
-        <p id="progress-text"></p>
-      </div>
     </div>
 
     <section class="online" aria-labelledby="online-title">

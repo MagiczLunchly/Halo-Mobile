@@ -329,9 +329,20 @@ can run the game, copies the game data out of the player's disc image
     return workerTask(message, (message) => {
       const fraction = message.total ? message.done / message.total : 0;
       $('progress-fill').style.width = (fraction * 100).toFixed(1) + '%';
+      $('download-percent').textContent = message.total ? Math.min(99, Math.floor(fraction * 100)) + '%' : '…';
+      $('download-bar').setAttribute('aria-valuenow', Math.min(99, Math.floor(fraction * 100)));
       const seconds = (Date.now() - started) / 1000;
       const rate = message.done / Math.max(seconds, 0.1);
       const left = rate > 0 ? (message.total - message.done) / rate : 0;
+      if (message.phase === 'download') {
+        $('download-title').textContent = 'Downloading Halo CE';
+        $('progress-text').textContent = `${(message.done / 1e6).toFixed(0)} MB` +
+          (message.total ? ` of ${(message.total / 1e6).toFixed(0)} MB` : '') +
+          (seconds > 3 ? ` · ${(rate / 1e6).toFixed(1)} MB/s` : '') +
+          (message.total && seconds > 3 ? ` · ${left < 60 ? Math.ceil(left) + ' sec' : Math.ceil(left / 60) + ' min'} left` : '');
+        $('download-detail').textContent = 'Installing ' + (message.file || 'game data') + ' · Keep this page open';
+        return;
+      }
       $('progress-text').textContent = `Copying maps/${message.file}: ` +
         `${(message.done / 1e9).toFixed(2)} of ${(message.total / 1e9).toFixed(2)} GB` +
         (seconds > 3 ? `, about ${Math.ceil(left / 60)} min left` : '');
@@ -373,10 +384,61 @@ can run the game, copies the game data out of the player's disc image
   }
 
   function setImportBusy(busy) {
-    for (const id of ['iso-file', 'maps-folder', 'import-local-maps', 'play-streamed-maps', 'play', 'delete-data']) {
+    for (const id of ['iso-file', 'maps-folder', 'import-local-maps', 'play-streamed-maps', 'play', 'delete-data', 'retry-download']) {
       $(id).disabled = busy;
     }
     for (const button of $('games').querySelectorAll('button, input')) button.disabled = busy;
+  }
+
+  async function downloadFirstVisitGame() {
+    if (state.importing || state.games.some((game) => !game.streamed)) return;
+    let config;
+    try {
+      const response = await fetch('game-download.json', { cache: 'no-store' });
+      if (!response.ok) return;
+      config = await response.json();
+      if (typeof config.url !== 'string' || !config.url.trim()) return;
+    } catch { return; }
+    const id = 'download-' + crypto.randomUUID();
+    const target = ['games', id];
+    const name = String(config.name || 'Halo CE').slice(0, 60);
+    state.importing = id;
+    setImportBusy(true);
+    $('retry-download').hidden = true;
+    $('progress').hidden = false;
+    $('progress-fill').style.width = '0%';
+    $('progress-text').textContent = 'Downloading the game for your first visit…';
+    $('download-title').textContent = 'Getting Halo CE ready';
+    $('download-percent').textContent = '0%';
+    $('download-detail').textContent = 'One download. Saved on this device for next time.';
+    if (navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    try {
+      await copyGameData({ op: config.format === 'maps-gzip' ? 'download-maps' : 'download-iso',
+        url: new URL(config.url, location.href).href, target, name,
+        files: config.files, downloadBytes: config.downloadBytes, rangeDownload: config.rangeDownload });
+      settings.game = id;
+      saveSettings();
+      $('progress-text').textContent = 'Game downloaded. Tap Play to start.';
+      $('download-title').textContent = 'Ready to play';
+      $('download-percent').textContent = '100%';
+      $('download-bar').setAttribute('aria-valuenow', '100');
+      $('progress-fill').style.width = '100%';
+      $('download-detail').textContent = 'Game data saved on this device.';
+    } catch (error) {
+      $('download-title').textContent = 'Download interrupted';
+      $('progress-text').textContent = 'Download failed: ' + error.message;
+      $('retry-download').hidden = false;
+      log('automatic download: ' + error.message);
+      try {
+        const root = await navigator.storage.getDirectory();
+        const games = await root.getDirectoryHandle('games');
+        await games.removeEntry(id, { recursive: true });
+      } catch { /* no partial installation */ }
+    } finally {
+      state.importing = null;
+      await refreshGames();
+      setImportBusy(false);
+    }
   }
 
   async function importMaps(message, name) {
@@ -1479,6 +1541,7 @@ can run the game, copies the game data out of the player's disc image
     $('opt-gldebug').checked = settings.glDebug;
     $('opt-gldebug').onchange = (event) => { settings.glDebug = event.target.checked; saveSettings(); };
     $('iso-file').onchange = onImageChosen;
+    $('retry-download').onclick = downloadFirstVisitGame;
     $('maps-folder').onchange = onMapsChosen;
     $('import-local-maps').onclick = onLocalMaps;
     $('play-streamed-maps').onclick = () => {
@@ -1548,6 +1611,7 @@ can run the game, copies the game data out of the player's disc image
     setUpLobby().catch((error) => log('lobby: ' + error));
     setUpChat();
     checkForUpdate();
+    await downloadFirstVisitGame();
   }
 
   main().catch((error) => {

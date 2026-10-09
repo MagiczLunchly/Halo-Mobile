@@ -1,0 +1,105 @@
+{
+  "url": "game-data/halo-maps.bin.gz",
+  "format": "maps-gzip",
+  "name": "Halo CE",
+  "downloadBytes": 1857797028,
+  "files": [
+    {
+      "name": "ui.map",
+      "size": 14145536
+    },
+    {
+      "name": "a10.map",
+      "size": 173903872
+    },
+    {
+      "name": "a30.map",
+      "size": 152610816
+    },
+    {
+      "name": "a50.map",
+      "size": 176224256
+    },
+    {
+      "name": "b30.map",
+      "size": 162877440
+    },
+    {
+      "name": "b40.map",
+      "size": 186873856
+    },
+    {
+      "name": "beavercreek.map",
+      "size": 22122496
+    },
+    {
+      "name": "bloodgulch.map",
+      "size": 22571008
+    },
+    {
+      "name": "boardingaction.map",
+      "size": 22075392
+    },
+    {
+      "name": "c10.map",
+      "size": 166926336
+    },
+    {
+      "name": "c20.map",
+      "size": 76980224
+    },
+    {
+      "name": "c40.map",
+      "size": 166295552
+    },
+    {
+      "name": "carousel.map",
+      "size": 20215808
+    },
+    {
+      "name": "chillout.map",
+      "size": 20336640
+    },
+    {
+      "name": "d20.map",
+      "size": 131012608
+    },
+    {
+      "name": "d40.map",
+      "size": 170405888
+    },
+    {
+      "name": "damnation.map",
+      "size": 23756800
+    },
+    {
+      "name": "hangemhigh.map",
+      "size": 21338112
+    },
+    {
+      "name": "longest.map",
+      "size": 20512768
+    },
+    {
+      "name": "prisoner.map",
+      "size": 21323776
+    },
+    {
+      "name": "putput.map",
+      "size": 19777536
+    },
+    {
+      "name": "ratrace.map",
+      "size": 23840768
+    },
+    {
+      "name": "sidewinder.map",
+      "size": 24823808
+    },
+    {
+      "name": "wizard.map",
+      "size": 19687424
+    }
+  ],
+  "rangeDownload": true
+}

@@ -28,6 +28,8 @@ const SHELL = [
   'lobby.js',
   'style.css',
   'xiso-worker.js',
+  'iso-download.js',
+  'maps-download.js',
   'audio-worklet.js',
   'halo.js',
   'halo.wasm',
