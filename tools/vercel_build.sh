@@ -4,7 +4,12 @@ set -euo pipefail
 # Cache the official compiler alongside Vercel's build cache.
 sdk_dir="$PWD/.cache/emsdk"
 if [ ! -f "$sdk_dir/emsdk.py" ]; then
-  git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$sdk_dir"
+  # Vercel may restore installed SDK files without the SDK\'s source scripts.
+  # Clone into an empty temporary folder, then merge into the restored cache.
+  sdk_seed="$(mktemp -d)"
+  git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$sdk_seed"
+  mkdir -p "$sdk_dir"
+  cp -a "$sdk_seed/." "$sdk_dir/"
 fi
 python3 "$sdk_dir/emsdk.py" install 6.0.10
 python3 "$sdk_dir/emsdk.py" activate 6.0.10
