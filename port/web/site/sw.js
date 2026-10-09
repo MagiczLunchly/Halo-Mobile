@@ -86,12 +86,15 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-function isolated(response) {
+function isolated(response, request) {
   if (!response || response.status === 0 || response.type === 'opaque') return response;
   const headers = new Headers(response.headers);
   headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
-  headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+  // Permit only the public launcher document to be embedded by another site.
+  const launcher = request && request.mode === 'navigate' &&
+    ['/', '/index.html'].includes(new URL(request.url).pathname);
+  headers.set('Cross-Origin-Resource-Policy', launcher ? 'cross-origin' : 'same-origin');
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
@@ -114,13 +117,13 @@ async function respond(request) {
     return isolated(await fetch('version.json', { cache: 'no-store' }));
   }
   const cached = await cachedResponse(request);
-  if (cached) return isolated(cached);
+  if (cached) return isolated(cached, request);
   try {
-    return isolated(await fetch(request));
+    return isolated(await fetch(request), request);
   } catch (error) {
     if (request.mode === 'navigate') {
       const shell = await cachedResponse(new Request('index.html'));
-      if (shell) return isolated(shell);
+      if (shell) return isolated(shell, request);
     }
     throw error;
   }
