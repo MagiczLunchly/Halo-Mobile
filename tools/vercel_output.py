@@ -34,7 +34,7 @@ def output_config(map_origin=""):
         ])
     routes.append({
         "src": "/game-data/halo-maps\\.bin\\.gz",
-        "dest": "https://github.com/MagiczLunchly/Halo-Mobile/releases/download/halo-game-data-v1/halo-maps.bin.gz",
+        "dest": "/game-data",
     })
     routes.append({"handle": "filesystem"})
     return {"version": 3, "routes": routes, "cache": [".cache/emsdk/**"]}
@@ -50,6 +50,12 @@ def main():
     output = Path(".vercel/output")
     output.mkdir(parents=True, exist_ok=True)
     shutil.copytree(site, output / "static", dirs_exist_ok=True)
+    download_function = output / "functions/game-data.func"
+    download_function.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile("tools/game_data_proxy.js", download_function / "index.js")
+    (download_function / ".vc-config.json").write_text(json.dumps({
+        "runtime": "edge", "entrypoint": "index.js",
+    }) + "\n", encoding="utf-8")
     (output / "config.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
 
 
